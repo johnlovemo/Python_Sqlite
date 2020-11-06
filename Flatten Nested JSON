@@ -1,0 +1,87 @@
+from itertools import chain, starmap
+from Export_to_Table_ver2 import insert_values_to_table
+import pandas as pd
+import numpy as np
+import json
+import os
+
+def flatten_json_iterative_solution(dictionary):
+    """Flatten a nested json file"""
+
+    def unpack(parent_key, parent_value):
+        """Unpack one level of nesting in json file"""
+        # Unpack one level only!!!
+
+        if isinstance(parent_value, dict):
+            for key, value in parent_value.items():
+                temp1 = parent_key + ':-:' + key
+                yield temp1, value
+        elif isinstance(parent_value, list):
+            i = 0
+            for value in parent_value:
+                temp2 = parent_key + '_' + str(i)
+                i += 1
+                yield temp2, value
+        else:
+            yield parent_key, parent_value
+
+            # Keep iterating until the termination condition is satisfied
+
+    while True:
+        # Keep unpacking the json file until all values are atomic elements (not dictionary or list)
+        dictionary = dict(chain.from_iterable(starmap(unpack, dictionary.items())))
+        # Terminate condition: not any value in the json file is dictionary or list
+        if not any(isinstance(value, dict) for value in dictionary.values()) and \
+                not any(isinstance(value, list) for value in dictionary.values()):
+            break
+
+    return dictionary
+
+#print(type(pet))
+
+
+path = r'C:\Users\johnj\App\JSON'
+file_full = path + '\\' + 'test_100.json'
+print(file_full)
+
+#--------------------------------------------------------------------
+with open(file_full, encoding='utf-8', errors='ignore') as data_file:
+   er = json.loads(data_file.read())
+#--------------------------------------------------------------------
+#print(er)
+
+df = pd.Series(flatten_json_iterative_solution(er)).to_frame()
+
+#writer = pd.ExcelWriter('Flatten_Nested_JSON_1.xlsx')
+#df.to_excel(writer,"templates", index=True, header=True)
+#writer.save()
+
+print(df.head())
+
+df['search_index'] = df.index
+df.columns = ['value','search_index']
+
+#df_1 = df[df['index'] == '1:-:payee:-:number']
+#df_2 = df[df['index'].str.contains('payee')]
+#df_2 = df[df['index'].str.contains('(>:-:_id)')]
+#print(df_2)
+er_json_regex = pd.read_csv(path + '\\' + 'ER JSON Regex.csv')
+
+#writer = pd.ExcelWriter('Flatten_Nested_JSON_2.xlsx')
+#for index, row in er_json_regex.iterrows():
+#df_2 = df[df['index'].str.contains(row['Regex'])]R
+#df_2.to_excel(writer,"templates" + str(index), index=True, header=True)
+#df.to_excel(writer,"templates", index=True, header=True)
+#writer.save()
+file_name = ''
+id_len = 18
+for index, row in er_json_regex.iterrows():
+    df2 = df[df['search_index'].str.contains(row['Regex'])]
+    df2['id'] = df2.search_index.str[:id_len]
+    position = str(df2.iloc[0]['search_index']).find('>:-:', 1)
+    file_name = str(df2.iloc[0]['search_index'])[position+4:]
+    file_path = r'C:\Users\johnj\App\JSON\Mapping'
+    output_file = os.path.join(str(index))
+    # call function
+    insert_values_to_table(output_file, df2)
+
